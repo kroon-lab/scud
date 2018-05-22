@@ -7,7 +7,6 @@
 
 ## Install/Source ##
 
-* git clone repository to desired loction: "git clone git@gitlab.com/timdeklijn/scud"
 * Go into the scud folder
 * in source_scud.sh replace phenix path with actual phenix path
 * source source_scud.sh
