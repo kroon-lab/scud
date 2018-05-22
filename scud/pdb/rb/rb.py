@@ -13,6 +13,7 @@ from scud.general.log_writer import Log
 
 from rb_pdb import RB_PDB
 from rb_pdb import RB_Optimiser
+from rb_pdb import RB_Aniso_Optimiser
 
 def run(args = None,
         l = None):
@@ -178,35 +179,57 @@ def run(args = None,
 #                           Start simplex                                 #
 ###########################################################################
 
-    if p.input.rb_type == 'rot':
+    #### If not aniso optimize 1 trans and 1 rot parameter: ####
 
-        #### Initialize start values for rb_type rot ####
+    if p.params.aniso == False:
+        if p.input.rb_type == 'rot':
 
-        start_trans_sigma = 0.0
-        l.show_info('Start trans_sigma = {}'.format(start_trans_sigma))
-        start_rot_sigma = 1.
+            #### Initialize start values for rb_type rot ####
 
-    elif p.input.rb_type == 'trans':
+            start_trans_sigma = 0.0
+            l.show_info('Start trans_sigma = {}'.format(start_trans_sigma))
+            start_rot_sigma = 1.
 
-        #### Initialize start values for rb_type trans ####
+        elif p.input.rb_type == 'trans':
 
-        start_trans_sigma = b_to_rmsf(np.mean(filter_b))*.9
-        l.show_info('Start trans_sigma = {}'.format(start_trans_sigma))
-        start_rot_sigma = 0.
+            #### Initialize start values for rb_type trans ####
 
-    elif p.input.rb_type == 'mix':
+            start_trans_sigma = b_to_rmsf(np.mean(filter_b))*.9
+            l.show_info('Start trans_sigma = {}'.format(start_trans_sigma))
+            start_rot_sigma = 0.
 
-        #### Initialize start values for rb_type mix ####
+        elif p.input.rb_type == 'mix':
 
-        # Mix works better if the rotation angle is fitted once before both
-        # parameters are optimize simultaniously
+            #### Initialize start values for rb_type mix ####
 
-        l.process_message('Starting 2 step rb fitting, finding initial rotation angle...')
-        start_trans_sigma = 0.0
-        l.show_info('Start trans_sigma = {}'.format(start_trans_sigma))
-        start_rot_sigma = 1.
+            # Mix works better if the rotation angle is fitted once before both
+            # parameters are optimize simultaniously
 
-        #### Optimize rotation only ####
+            l.process_message('Starting 2 step rb fitting, finding initial rotation angle...')
+            start_trans_sigma = 0.0
+            l.show_info('Start trans_sigma = {}'.format(start_trans_sigma))
+            start_rot_sigma = 1.
+
+            #### Optimize rotation only ####
+
+            rb_optimizer = RB_Optimiser(trans_sigma = start_trans_sigma,
+                                        rot_sigma = start_rot_sigma,
+                                        template_pdb = template_pdb,
+                                        ens_size = ens_size,
+                                        target_b = target_pdb.target_b[target_pdb.mask],
+                                        mask = target_pdb.mask,
+                                        rb_type = 'rot',
+                                        l = l)
+
+            # For dual optimization use fractions of average B and optimized rotation only
+
+            start_trans_sigma = 0.9 * b_to_rmsf(np.mean(filter_b))
+            start_rot_sigma = 0.8 * list(rb_optimizer.result)[0]
+
+        else:
+            raise Exception('Not an rb_type')
+
+        #### Perform simplex ####
 
         rb_optimizer = RB_Optimiser(trans_sigma = start_trans_sigma,
                                     rot_sigma = start_rot_sigma,
@@ -214,42 +237,45 @@ def run(args = None,
                                     ens_size = ens_size,
                                     target_b = target_pdb.target_b[target_pdb.mask],
                                     mask = target_pdb.mask,
-                                    rb_type = 'rot',
+                                    rb_type = p.input.rb_type,
                                     l = l)
 
-        # For dual optimization use fractions of average B and optimized rotation only
+        l.process_message('Simplex minimization finished...')
 
-        start_trans_sigma = 0.9 * b_to_rmsf(np.mean(filter_b))
-        start_rot_sigma = 0.8 * list(rb_optimizer.result)[0]
+        #### Finish up simplex ####
 
+        # Show simplex results
+        r = list(rb_optimizer.result)
+        if len(r) == 2:
+            l.show_info('Results: \n\ttranslation (A): {:.2f} \n\tangle (deg): {:.2f}'.format(r[0], r[1]))
+        elif len(r) == 1 and p.input.rb_type == 'rot':
+            l.show_info('Results: \n\tangle (deg): {:.2f}'.format(r[0]))
+        elif len(r) == 1 and p.input.rb_type == 'trans':
+            l.show_info('Results: \n\ttranslation (A): {:.2f}'.format(r[0]))
+        else:
+            raise Exception('Invalid Value')
+
+    #### Anisotropic fitting of rigid body motion ####
+
+    elif p.params.aniso == True:
+
+        l.process_message('Simplex miminizing six parameters...')
+        
+        rb_optimizer = RB_Aniso_Optimiser(trans_sigma_x = 0.5,
+                                          trans_sigma_y = 0.5,
+                                          trans_sigma_z = 0.5,
+                                          rot_sigma = None,
+                                          template_pdb = template_pdb,
+                                          ens_size = ens_size,
+                                          target_b = target_pdb.target_b[target_pdb.mask],
+                                          mask = target_pdb.mask,
+                                          l = l)
+
+
+
+    # check for errors
     else:
-        raise Exception('Not an rb_type')
-
-    #### Perform simplex ####
-
-    rb_optimizer = RB_Optimiser(trans_sigma = start_trans_sigma,
-                                rot_sigma = start_rot_sigma,
-                                template_pdb = template_pdb,
-                                ens_size = ens_size,
-                                target_b = target_pdb.target_b[target_pdb.mask],
-                                mask = target_pdb.mask,
-                                rb_type = p.input.rb_type,
-                                l = l)
-
-    l.process_message('Simplex minimization finished...')
-
-    #### Finish up simplex ####
-
-    # Show simplex results
-    r = list(rb_optimizer.result)
-    if len(r) == 2:
-        l.show_info('Results: \n\ttranslation (A): {:.2f} \n\tangle (deg): {:.2f}'.format(r[0], r[1]))
-    elif len(r) == 1 and p.input.rb_type == 'rot':
-        l.show_info('Results: \n\tangle (deg): {:.2f}'.format(r[0]))
-    elif len(r) == 1 and p.input.rb_type == 'trans':
-        l.show_info('Results: \n\ttranslation (A): {:.2f}'.format(r[0]))
-    else:
-        raise Exception('Invalid Value')
+        raise Exception('No or wrong aniso input')
 
 ###########################################################################
 #                       Analysis of ensemble                              #

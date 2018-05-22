@@ -551,3 +551,108 @@ class RB_Optimiser(object):
 
         # Return score
         return score
+
+class RB_Aniso_Optimiser(object):
+    '''
+    Simplex optimiser class.
+
+    Calls scitbx simplex and optimizes target function for rotation and translation
+    '''
+    def __init__(self,
+                 trans_sigma_x = None,
+                 trans_sigma_y = None,
+                 trans_sigma_z = None,
+                 rot_sigma = None,
+                 template_pdb = None,
+                 ens_size = None,
+                 target_b = None,
+                 mask = None,
+                 rb_type = None,
+                 l = None):
+
+        '''
+        RB Simplex initialization
+        '''
+
+        from scitbx.simplex import simplex_opt
+
+        #### Gather input parameters ####
+
+        l.process_message('Simplex minimizing rms difference B-factor profile input and ensemble')
+
+        # Some parameters needed in this class
+        self.template_pdb = template_pdb
+        self.center_of_mass = self.template_pdb.com
+        self.ens_size = ens_size
+        self.target_b = target_b
+        self.mask = mask
+        self.rb_type = rb_type
+        self.l = l
+
+        #### Initialize simplex ####
+
+        # Number of parameters
+        self.n = 3 
+
+        # Create start matrix for simplex
+        start_simplex = None
+
+        start_simplex = np.repeat([[trans_sigma_x, trans_sigma_y, trans_sigma_z]],self.n+1,axis=0)
+
+        print np.shape(start_simplex)
+
+        for ii in range(self.n):
+            start_simplex[ii+1, ii] = 1.1*start_simplex[ii+1, ii]
+
+        print start_simplex
+
+        #### Perform Simplex minimization ####
+
+        start_simplex = map(flex.double, start_simplex)
+
+        simplex = simplex_opt(dimension = self.n,
+                              matrix = start_simplex,
+                              evaluator = self,
+                              tolerance = 1.e-3)
+
+        # Extract result
+        self.result = simplex.get_solution()
+
+    def target(self, parameters):
+        '''
+        Target function simplex
+        has to be called target
+        '''
+
+        #### Parameters to optimize ####
+        
+        trans_sigma_x = parameters[0]
+        trans_sigma_y = parameters[1]
+        trans_sigma_z = parameters[2]
+
+        #### Target function ####
+
+        #### Penalize negative value for sigma's ####
+        if trans_sigma_x < 0 or trans_sigma_y < 0 or trans_sigma_z < 0:
+            score = 1e2
+
+        else:
+            # Target function placed in RB_PDB class
+            trans_sigma = [trans_sigma_x, trans_sigma_y, trans_sigma_z]
+            rot_sigma = None
+            score = self.template_pdb.simplex_target_func_ca(trans_sigma = trans_sigma,
+                                                             rot_sigma = rot_sigma,
+                                                             center_of_mass = self.center_of_mass,
+                                                             ens_size = self.ens_size,
+                                                             target_b = self.target_b,
+                                                             mask = self.mask,
+                                                             rb_type = self.rb_type,
+                                                             l = self.l)
+
+
+        self.l.show_info('| trans: {:10.4f} | rot: {:10.4f} | score: {:10.4f} |'.format(trans_sigma,
+                                                                                        rot_sigma,
+                                                                                        score))
+
+        # Return score
+        return score

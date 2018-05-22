@@ -35,6 +35,9 @@ def phil_parse(args=None,log=None):
           ensemble_size = 100
             .type = int
             .help = 'Size of output ensemble'
+          aniso = True
+            .type = bool
+            .help = 'Generate ensemble based on anisotropic translation/rotation'
           seed = 123456
             .type = int
             .help = 'Seed for random number generators used in this method'
