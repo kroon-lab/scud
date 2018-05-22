@@ -7,6 +7,7 @@
 
 ## Install/Source ##
 
+* github scud
 * Go into the scud folder
 * in source_scud.sh replace phenix path with actual phenix path
 * source source_scud.sh
