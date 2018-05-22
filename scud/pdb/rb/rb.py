@@ -438,4 +438,4 @@ def plot_b_factors(x,y1,y2,nm):
 
     #### Clear figure ####
 
-  fig.clf()
+    fig.clf()
