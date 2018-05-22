@@ -1,0 +1,3 @@
+#!/bin/sh
+
+cctbx.python -m scud.map.map2map.__init__ "$@"

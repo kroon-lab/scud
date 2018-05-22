@@ -1,0 +1,3 @@
+#!/bin/sh
+
+cctbx.python -m scud.exp.B_noise.__init__ "$@"

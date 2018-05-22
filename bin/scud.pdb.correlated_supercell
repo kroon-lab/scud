@@ -1,0 +1,3 @@
+#!/bin/sh
+
+cctbx.python -m scud.pdb.correlated_supercell.__init__ "$@"

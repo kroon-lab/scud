@@ -1,0 +1,3 @@
+#!/bin/sh
+
+cctbx.python -m scud.pdb.chain2b.__init__ "$@"

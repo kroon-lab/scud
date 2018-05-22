@@ -1,0 +1,3 @@
+#!/bin/sh
+
+cctbx.python -m scud.exp.cypa_helix.__init__ "$@"

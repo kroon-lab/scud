@@ -1,0 +1,3 @@
+#!/bin/sh
+
+cctbx.python -m scud.exp.additivity_all.__init__ "$@"

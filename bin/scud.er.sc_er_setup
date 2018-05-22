@@ -1,0 +1,3 @@
+#!/bin/sh
+
+cctbx.python -m scud.er.sc_er_setup.__init__ "$@"

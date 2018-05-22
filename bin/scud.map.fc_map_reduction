@@ -1,0 +1,3 @@
+#!/bin/sh
+
+cctbx.python -m scud.map.fc_map_reduction.__init__ "$@"

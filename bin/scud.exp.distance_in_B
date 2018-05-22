@@ -1,0 +1,3 @@
+#!/bin/sh
+
+cctbx.python -m scud.exp.distance_in_B.__init__ "$@"

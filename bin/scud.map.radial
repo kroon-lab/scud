@@ -1,0 +1,3 @@
+#!/bin/sh
+
+cctbx.python -m scud.map.radial.__init__ "$@"

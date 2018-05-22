@@ -1,0 +1,3 @@
+#!/bin/sh
+
+cctbx.python -m scud.exp.diffuse_all.__init__ "$@"

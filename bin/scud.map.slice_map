@@ -1,0 +1,3 @@
+#!/bin/sh
+
+cctbx.python -m scud.map.slice_map.__init__ "$@"

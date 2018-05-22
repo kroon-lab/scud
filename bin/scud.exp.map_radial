@@ -1,0 +1,3 @@
+#!/bin/sh
+
+cctbx.python -m scud.exp.map_radial.__init__ "$@"

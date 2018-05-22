@@ -1,0 +1,3 @@
+#!/bin/sh
+
+dials.python -m scud.img.rmBragg.__init__ "$@"

@@ -1,0 +1,3 @@
+#!/bin/sh
+
+cctbx.python -m scud.exp.simple_ft.__init__ "$@"

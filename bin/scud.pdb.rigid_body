@@ -1,0 +1,3 @@
+#!/bin/sh
+
+cctbx.python -m scud.pdb.rigid_body.__init__ "$@"

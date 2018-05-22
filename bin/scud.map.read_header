@@ -1,0 +1,3 @@
+#!/bin/sh
+
+cctbx.python -m scud.map.read_header.__init__ "$@"

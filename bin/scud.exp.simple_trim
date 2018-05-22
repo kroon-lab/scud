@@ -1,0 +1,3 @@
+#!/bin/sh
+
+cctbx.python -m scud.exp.simple_trim.__init__ "$@"

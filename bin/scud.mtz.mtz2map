@@ -1,0 +1,3 @@
+#!/bin/sh
+
+cctbx.python -m scud.mtz.mtz2map.__init__ "$@"

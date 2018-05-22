@@ -1,0 +1,3 @@
+#!/bin/sh
+
+cctbx.python -m scud.exp.sigma2mtz.__init__ "$@"

@@ -1,0 +1,3 @@
+#!/bin/sh
+
+cctbx.python -m scud.er.sc_reduce.__init__ "$@"

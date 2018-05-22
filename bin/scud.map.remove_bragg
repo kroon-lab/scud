@@ -1,0 +1,3 @@
+#!/bin/sh
+
+cctbx.python -m scud.map.remove_bragg.__init__ "$@"

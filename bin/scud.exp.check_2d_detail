@@ -1,0 +1,3 @@
+#!/bin/sh
+
+cctbx.python -m scud.exp.check_2d_detail.__init__ "$@"

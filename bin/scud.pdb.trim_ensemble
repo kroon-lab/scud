@@ -1,0 +1,3 @@
+#!/bin/sh
+
+cctbx.python -m scud.pdb.trim_ensemble.__init__ "$@"
