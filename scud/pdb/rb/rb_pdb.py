@@ -55,6 +55,7 @@ class RB_PDB(object):
         Then fill list in cctbx format with rotation matrix elements and return
         '''
 
+
         #### Calculate cos and Sine ####
 
         c = np.cos(angle)
@@ -169,51 +170,108 @@ class RB_PDB(object):
         Then generate random vector
         Calculate rotation matrix around the vector, using angle.
         '''
+        
+        # Check if rotation_sigma is list or not:
+        if isinstance(rotation_sigma, list) == True:
 
-        # Angle in rad
-        rotation_sigma = np.deg2rad(rotation_sigma)
+            aniso = True
+
+            # anisotropic rotation
+            rot_sigma_x = np.deg2rad(rotation_sigma[0])
+            rot_sigma_y = np.deg2rad(rotation_sigma[1])
+            rot_sigma_z = np.deg2rad(rotation_sigma[2])
+
+            # Tolerance setting
+            rot_sigma_tolerance = np.linalg.norm([rot_sigma_x, rot_sigma_y,rot_sigma_z])
+            
+        elif isinstance(rotation_sigma, list) == False:
+
+            aniso = False
+
+            # isotropic rotation
+            rot_sigma = np.deg2rad(rotation_sigma)
+
+            # Tolerance setting
+            rot_sigma_tolerance = rot_sigma
+
+        else:
+
+            raise Exception('Rotation sigma not proper type')
 
         #### Set tolerance ####
 
         n = 2
-        tolerance = n*abs(rotation_sigma)
+        tolerance = n*abs(rot_sigma_tolerance)
 
         #### Prepare rotation List ####
 
         self.angle_list = []
         rotation_matrix_list = []
 
-        # Loop over number of ensembles
+        #### Create rotation matrix list ####
+
+        # loop over number of ensembles
         for i in range(ensemble_size):
 
-            #### Check for 'extreme' values ####
-
-            # Escape from while statement
+            # Repeat if not within tolerance
             sigma_check = False
 
-            # Keep repicking values untill within tolerance
             while not sigma_check:
 
-                # Pick rotation angle
-                if rotation_sigma <= 1e-6:
-                    a = 0.0
-                    break
+                # Isotropic rotation
+                if aniso == False:
+
+                    # If sigma = 0 angle is 0
+                    if rot_sigma <= 1e-6:
+                        angle = 0.0
+                        break
+                    angle = np.random.normal(0.0,rot_sigma,1)[0]
+
+                    # Check value
+                    if abs(angle) < tolerance:
+
+                        # Escape while statement
+                        sigma_check = True
+   
+                # anisotropic rotation
+                elif aniso == True:
+
+                    # Check for 0 rotation, then angles are 0
+                    angle = np.zeros(3)
+                    if rot_sigma_x >=1e-6:
+                        angle[0] = np.random.normal(0.0,rot_sigma_x,1)[0]
+                    if rot_sigma_y >=1e-6:
+                        angle[1] = np.random.normal(0.0,rot_sigma_y,1)[0]
+                    if rot_sigma_z >=1e-6:
+                        angle[2] = np.random.normal(0.0,rot_sigma_z,1)[0]
+
+                    # Check values
+                    if abs(angle[0]) < tolerance and abs(angle[1]) < tolerance and abs(angle[2]) < tolerance:
+
+                        # Escape while statement
+                        sigma_check = True
+
                 else:
-                    a = np.random.normal(0.0,rotation_sigma,1)[0]
+                    raise Exception('Aniso boolean in rotation is wrong')
 
-                # Check value
-                if abs(a) < tolerance:
-                    # Escape while statement
-                    sigma_check = True
+                # Random vector to rotate around:
+                xyz = self._random_vector()
 
-            # Create random angle list from normal distribution
-            self.angle_list.append(a)
+                #### normalize and scale if aniso ####
 
-            # Random vector to rotate around:
-            xyz = self._random_vector()
+                if aniso == True:
+
+                    # (1 / vectorlength) * vector
+                    xyz = (1. / np.linalg.norm(xyz)) * xyz
+
+                    # Scale angles based on vectors (sum(xyz(norm)**2)*angle)
+                    angle = np.sum((xyz**2 * angle))
 
             # create rotation matrix from rotation vector and angle
-            rotation_matrix_list.append(self._rotation_matrix(xyz,a))
+            rotation_matrix_list.append(self._rotation_matrix(xyz,angle))
+
+            # Save angles for plotting
+            self.angle_list.append(angle)
 
         return rotation_matrix_list
 
@@ -227,8 +285,31 @@ class RB_PDB(object):
 
         - Use polar coordinates to generate xyz coordinates for translation vectors
         - Check if length of the vector is =< n*sigma
+        - Depending on translation_sigma type (single value or list) do isotropic or
+          anisotropic translation
 
         '''
+
+
+        #### If translation_sigma is a single value do isotropic ####
+        
+        if isinstance(translation_sigma, list) == False:
+        
+            translation_sigma_x = translation_sigma
+            translation_sigma_y = translation_sigma
+            translation_sigma_z = translation_sigma
+
+            tolerance_sigma = translation_sigma
+
+        #### If translation_sigma is a list do anisotropic ####
+
+        elif isinstance(translation_sigma, list) == True:
+            
+            translation_sigma_x = translation_sigma[0]
+            translation_sigma_y = translation_sigma[1]
+            translation_sigma_z = translation_sigma[2]
+
+            tolerance_sigma = np.linalg.norm(translation_sigma)
 
         #### Init parameters ####
 
@@ -240,7 +321,7 @@ class RB_PDB(object):
 
         # set tolerance
         n = 2 # Should be input parameter
-        tolerance = n * translation_sigma
+        tolerance = n * tolerance_sigma
 
         for i in range(ensemble_size):
 
@@ -262,9 +343,9 @@ class RB_PDB(object):
 
                 #### Create coordinates #####
 
-                x = (np.cos(2 * np.pi * v2) * fac) * translation_sigma
-                y = (np.sin(2 * np.pi * v2) * fac) * translation_sigma
-                z = (np.cos(2 * np.pi * v3) * fac) * translation_sigma
+                x = (np.cos(2 * np.pi * v2) * fac) * translation_sigma_x
+                y = (np.sin(2 * np.pi * v2) * fac) * translation_sigma_y
+                z = (np.cos(2 * np.pi * v3) * fac) * translation_sigma_z
 
                 #### Calculate distance ####
 
@@ -280,6 +361,7 @@ class RB_PDB(object):
             # Save vector and vector length to lists
             self.v_list.append(np.array([x,y,z]))
             self.v_dist_list.append(vector_length)
+
 
     def ensemble_to_B_factor(self,
                              ensemble_hierarchy=None):
@@ -559,15 +641,14 @@ class RB_Aniso_Optimiser(object):
     Calls scitbx simplex and optimizes target function for rotation and translation
     '''
     def __init__(self,
-                 trans_sigma_x = None,
-                 trans_sigma_y = None,
-                 trans_sigma_z = None,
-                 rot_sigma = None,
+                 trans_sigma_array = None,
+                 rot_sigma_array = None,
                  template_pdb = None,
                  ens_size = None,
                  target_b = None,
                  mask = None,
                  rb_type = None,
+                 step_size = 1.1,
                  l = None):
 
         '''
@@ -591,20 +672,44 @@ class RB_Aniso_Optimiser(object):
 
         #### Initialize simplex ####
 
-        # Number of parameters
-        self.n = 3 
-
         # Create start matrix for simplex
         start_simplex = None
+        
+        # Translation setup:
+        if self.rb_type == 'trans':
+            # Number of parameters
+            self.n = 3 
+            # Start array
+            start_simplex = np.repeat([trans_sigma_array],self.n+1,axis=0)
 
-        start_simplex = np.repeat([[trans_sigma_x, trans_sigma_y, trans_sigma_z]],self.n+1,axis=0)
+        # Rotation setup
+        if self.rb_type == 'rot':
+            # Number of parameters 
+            self.n = 3
+            # Start array
+            start_simplex = np.repeat([rot_sigma_array] ,self.n+1,axis=0)
+        
+        # Mix setup
+        if self.rb_type == 'mix':
+            # Number of parameters 
+            self.n = 6
+            # Combine rot and trans start sigma (Simplex accepts single list of params)
+            appended_sigma = np.append(trans_sigma_array,rot_sigma_array)
+            # Start array
+            start_simplex = np.repeat([appended_sigma] ,self.n+1,axis=0)
 
-        print np.shape(start_simplex)
-
+        # Start array with step sizes
         for ii in range(self.n):
-            start_simplex[ii+1, ii] = 1.1*start_simplex[ii+1, ii]
+            start_simplex[ii+1, ii] = step_size*start_simplex[ii+1, ii]
 
-        print start_simplex
+        # Print some info
+        l.process_message('Minimizing {} parameters'.format(self.n))
+        l.show_info('Starting Simplex Matrix: \n')
+
+        # Print start simplex
+        for i in start_simplex:
+            l.show_info('{}'.format(i))
+        l.show_info('\n')
 
         #### Perform Simplex minimization ####
 
@@ -626,33 +731,70 @@ class RB_Aniso_Optimiser(object):
 
         #### Parameters to optimize ####
         
-        trans_sigma_x = parameters[0]
-        trans_sigma_y = parameters[1]
-        trans_sigma_z = parameters[2]
+        # depending on rb_type        
+        if self.rb_type == 'trans':
+
+            # split parameters into 3 translation sigma's
+            trans_sigma = list(parameters)
+            rot_sigma = 0.0
+
+            # Penalty for negative values
+            if trans_sigma[0] < 0 or trans_sigma[1] < 0 or trans_sigma[2] < 0:
+                l.warning('negative translation sigma')
+                return 1e2
+
+        elif self.rb_type == 'rot':
+
+            # Obtain rotation parameters
+            rot_sigma = list(parameters)
+            trans_sigma = 0.0
+
+            # pentalty for negative values
+            if rot_sigma[0] < 0 or rot_sigma[1] < 0 or rot_sigma[2] < 0:
+                l.warning('negative rotation sigma')
+                return 1e2
+
+        elif self.rb_type == 'mix':
+
+            # split parameters into 3 translation sigma's and 3 rot sigma's
+            trans_sigma = list(parameters[0:3])
+            rot_sigma = list(parameters[3:6])
+
+            # Penalty for negative values
+            if trans_sigma[0] < 0 or trans_sigma[1] < 0 or trans_sigma[2] < 0 or rot_sigma[0] < 0 or rot_sigma[1] < 0 or rot_sigma[2] < 0:
+                l.warning('negative translation sigma')
+                return 1e2
+
+
+        else:
+            raise Exception('Wrong rb_type in aniso simplex')
 
         #### Target function ####
 
-        #### Penalize negative value for sigma's ####
-        if trans_sigma_x < 0 or trans_sigma_y < 0 or trans_sigma_z < 0:
-            score = 1e2
+        # Target function placed in RB_PDB class
+        score = self.template_pdb.simplex_target_func_ca(trans_sigma = trans_sigma,
+                                                         rot_sigma = rot_sigma,
+                                                         center_of_mass = self.center_of_mass,
+                                                         ens_size = self.ens_size,
+                                                         target_b = self.target_b,
+                                                         mask = self.mask,
+                                                         rb_type = self.rb_type,
+                                                         l = self.l)
+        #### Print info per cycle ####
 
-        else:
-            # Target function placed in RB_PDB class
-            trans_sigma = [trans_sigma_x, trans_sigma_y, trans_sigma_z]
-            rot_sigma = None
-            score = self.template_pdb.simplex_target_func_ca(trans_sigma = trans_sigma,
-                                                             rot_sigma = rot_sigma,
-                                                             center_of_mass = self.center_of_mass,
-                                                             ens_size = self.ens_size,
-                                                             target_b = self.target_b,
-                                                             mask = self.mask,
-                                                             rb_type = self.rb_type,
-                                                             l = self.l)
+        if self.rb_type == 'trans':
+            self.l.show_info('Translation: x : {:10.4f} | y : {:10.4f} | y : {:10.4f} |'.format(trans_sigma[0], trans_sigma[1],trans_sigma[2]))
 
+        if self.rb_type == 'rot':
+            self.l.show_info('Rotation   : x : {:10.4f} | y : {:10.4f} | y : {:10.4f} |'.format(rot_sigma[0], rot_sigma[1],rot_sigma[2]))
 
-        self.l.show_info('| trans: {:10.4f} | rot: {:10.4f} | score: {:10.4f} |'.format(trans_sigma,
-                                                                                        rot_sigma,
-                                                                                        score))
+        if self.rb_type == 'mix':
+            # Translation info
+            self.l.show_info('Translation: x : {:10.4f} | y : {:10.4f} | y : {:10.4f} |'.format(trans_sigma[0], trans_sigma[1],trans_sigma[2]))
+
+            # Rotation info
+            self.l.show_info('Rotation   : x : {:10.4f} | y : {:10.4f} | y : {:10.4f} |'.format(rot_sigma[0], rot_sigma[1],rot_sigma[2]))
+
 
         # Return score
         return score

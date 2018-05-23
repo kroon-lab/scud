@@ -196,7 +196,7 @@ def run(args = None,
 
             start_trans_sigma = b_to_rmsf(np.mean(filter_b))*.9
             l.show_info('Start trans_sigma = {}'.format(start_trans_sigma))
-            start_rot_sigma = 0.
+            start_rot_sigma = 3.
 
         elif p.input.rb_type == 'mix':
 
@@ -259,18 +259,73 @@ def run(args = None,
 
     elif p.params.aniso == True:
 
-        l.process_message('Simplex miminizing six parameters...')
-        
-        rb_optimizer = RB_Aniso_Optimiser(trans_sigma_x = 0.5,
-                                          trans_sigma_y = 0.5,
-                                          trans_sigma_z = 0.5,
-                                          rot_sigma = None,
-                                          template_pdb = template_pdb,
-                                          ens_size = ens_size,
-                                          target_b = target_pdb.target_b[target_pdb.mask],
-                                          mask = target_pdb.mask,
-                                          l = l)
+        # Translation start
+        start_trans = b_to_rmsf(np.mean(filter_b))*.9
+        trans_sigma_array = np.array([start_trans]*3)
 
+        # rotation start
+        rot_sigma_array = np.array([3., 3., 3.])
+
+
+        # For aniso rotation or translation 
+        if p.input.rb_type == 'trans' or p.input.rb_type == 'rot':
+
+            # Start simplex
+            rb_optimizer = RB_Aniso_Optimiser(trans_sigma_array = trans_sigma_array,
+                                              rot_sigma_array = rot_sigma_array,
+                                              template_pdb = template_pdb,
+                                              ens_size = ens_size,
+                                              target_b = target_pdb.target_b[target_pdb.mask],
+                                              mask = target_pdb.mask,
+                                              rb_type = p.input.rb_type,
+                                              l = l)
+
+
+        #### Single simplex for rot and trans, find starting vals for mix: ####
+
+        elif p.input.rb_type == 'mix':
+
+            #### First find translation start values ####
+
+            rb_optimizer = RB_Aniso_Optimiser(trans_sigma_array = trans_sigma_array,
+                                              rot_sigma_array = rot_sigma_array,
+                                              template_pdb = template_pdb,
+                                              ens_size = ens_size,
+                                              target_b = target_pdb.target_b[target_pdb.mask],
+                                              mask = target_pdb.mask,
+                                              rb_type = 'trans',
+                                              step_size = 1.5,
+                                              l = l)
+
+            # Save for later 
+            trans_1 = np.array(list(rb_optimizer.result))*0.75
+
+            #### Find start values for rotation ####
+
+            rb_optimizer = RB_Aniso_Optimiser(trans_sigma_array = trans_1,
+                                              rot_sigma_array = rot_sigma_array,
+                                              template_pdb = template_pdb,
+                                              ens_size = ens_size,
+                                              target_b = target_pdb.target_b[target_pdb.mask],
+                                              mask = target_pdb.mask,
+                                              rb_type = 'mix',
+                                              step_size = 1.5,
+                                              l = l)
+
+            # Save for later 
+            trans_2 = list(rb_optimizer.result)[0:3]
+            rot_1 = list(rb_optimizer.result)[3:6]
+
+            #### Find start values for rotation ####
+
+            rb_optimizer = RB_Aniso_Optimiser(trans_sigma_array = trans_2,
+                                              rot_sigma_array = rot_1,
+                                              template_pdb = template_pdb,
+                                              ens_size = ens_size,
+                                              target_b = target_pdb.target_b[target_pdb.mask],
+                                              mask = target_pdb.mask,
+                                              rb_type = 'mix',
+                                              l = l)
 
 
     # check for errors
@@ -319,7 +374,7 @@ def run(args = None,
 
     #### Analysis of Rotation angles ####
 
-    if p.input.rb_type != 'trans':
+    if p.input.rb_type != 'trans' and p.params.aniso == False:
         l.show_info('Average rotation angle (deg): {}'.format(np.mean(template_pdb.angle_list)))
         plot_histo(np.rad2deg(template_pdb.angle_list),
                    'rb_rot_angles.eps',
