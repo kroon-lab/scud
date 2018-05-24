@@ -188,13 +188,13 @@ def run(args = None,
 
             start_trans_sigma = 0.0
             l.show_info('Start trans_sigma = {}'.format(start_trans_sigma))
-            start_rot_sigma = 1.
+            start_rot_sigma = 3.
 
         elif p.input.rb_type == 'trans':
 
             #### Initialize start values for rb_type trans ####
 
-            start_trans_sigma = b_to_rmsf(np.mean(filter_b))*.9
+            start_trans_sigma = b_to_rmsf(np.mean(filter_b))*1.4
             l.show_info('Start trans_sigma = {}'.format(start_trans_sigma))
             start_rot_sigma = 3.
 
@@ -206,9 +206,9 @@ def run(args = None,
             # parameters are optimize simultaniously
 
             l.process_message('Starting 2 step rb fitting, finding initial rotation angle...')
-            start_trans_sigma = 0.0
+            start_trans_sigma = 0.4
             l.show_info('Start trans_sigma = {}'.format(start_trans_sigma))
-            start_rot_sigma = 1.
+            start_rot_sigma = 3.
 
             #### Optimize rotation only ####
 
@@ -223,7 +223,7 @@ def run(args = None,
 
             # For dual optimization use fractions of average B and optimized rotation only
 
-            start_trans_sigma = 0.9 * b_to_rmsf(np.mean(filter_b))
+            start_trans_sigma = b_to_rmsf(np.mean(filter_b))
             start_rot_sigma = 0.8 * list(rb_optimizer.result)[0]
 
         else:
@@ -260,11 +260,11 @@ def run(args = None,
     elif p.params.aniso == True:
 
         # Translation start
-        start_trans = b_to_rmsf(np.mean(filter_b))*.9
+        start_trans = b_to_rmsf(np.mean(filter_b))/ 3.
         trans_sigma_array = np.array([start_trans]*3)
 
         # rotation start
-        rot_sigma_array = np.array([3., 3., 3.])
+        rot_sigma_array = np.array([4., 1.5, 4.])
 
 
         # For aniso rotation or translation 
@@ -278,6 +278,7 @@ def run(args = None,
                                               target_b = target_pdb.target_b[target_pdb.mask],
                                               mask = target_pdb.mask,
                                               rb_type = p.input.rb_type,
+                                              step_size = 5.,
                                               l = l)
 
 
@@ -287,29 +288,31 @@ def run(args = None,
 
             #### First find translation start values ####
 
+            #rb_optimizer = RB_Aniso_Optimiser(trans_sigma_array = trans_sigma_array,
+            #                                  rot_sigma_array = rot_sigma_array,
+            #                                  template_pdb = template_pdb,
+            #                                  ens_size = ens_size,
+            #                                  target_b = target_pdb.target_b[target_pdb.mask],
+            #                                  mask = target_pdb.mask,
+            #                                  rb_type = 'rot',
+            #                                  step_size = 5,
+            #                                  l = l)
+
+            # Save for later 
+            #trans_1 = np.array(list(rb_optimizer.result))#*0.75
+#            rot = np.array(list(rb_optimizer.result))#*0.75
+            
+
+            #### Find start values for rotation ####
+
             rb_optimizer = RB_Aniso_Optimiser(trans_sigma_array = trans_sigma_array,
                                               rot_sigma_array = rot_sigma_array,
                                               template_pdb = template_pdb,
                                               ens_size = ens_size,
                                               target_b = target_pdb.target_b[target_pdb.mask],
                                               mask = target_pdb.mask,
-                                              rb_type = 'trans',
-                                              step_size = 1.5,
-                                              l = l)
-
-            # Save for later 
-            trans_1 = np.array(list(rb_optimizer.result))*0.75
-
-            #### Find start values for rotation ####
-
-            rb_optimizer = RB_Aniso_Optimiser(trans_sigma_array = trans_1,
-                                              rot_sigma_array = rot_sigma_array,
-                                              template_pdb = template_pdb,
-                                              ens_size = ens_size,
-                                              target_b = target_pdb.target_b[target_pdb.mask],
-                                              mask = target_pdb.mask,
                                               rb_type = 'mix',
-                                              step_size = 1.5,
+                                              step_size = 5,
                                               l = l)
 
             # Save for later 

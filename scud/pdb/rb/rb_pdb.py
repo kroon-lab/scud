@@ -504,7 +504,6 @@ class RB_PDB(object):
 
         # Get b-factors
         atom,b = self.ensemble_to_B_factor(ensemble_hierarchy=self.rb_ens_hierarchy)
-
         # Return rmsd with target b-factors
         return np.sqrt(np.mean((target_b - b[mask])**2))
 
@@ -718,7 +717,7 @@ class RB_Aniso_Optimiser(object):
         simplex = simplex_opt(dimension = self.n,
                               matrix = start_simplex,
                               evaluator = self,
-                              tolerance = 1.e-3)
+                              tolerance = 10)
 
         # Extract result
         self.result = simplex.get_solution()
@@ -751,7 +750,7 @@ class RB_Aniso_Optimiser(object):
 
             # pentalty for negative values
             if rot_sigma[0] < 0 or rot_sigma[1] < 0 or rot_sigma[2] < 0:
-                l.warning('negative rotation sigma')
+                #l.warning('negative rotation sigma')
                 return 1e2
 
         elif self.rb_type == 'mix':
@@ -762,7 +761,7 @@ class RB_Aniso_Optimiser(object):
 
             # Penalty for negative values
             if trans_sigma[0] < 0 or trans_sigma[1] < 0 or trans_sigma[2] < 0 or rot_sigma[0] < 0 or rot_sigma[1] < 0 or rot_sigma[2] < 0:
-                l.warning('negative translation sigma')
+                #l.warning('negative translation sigma')
                 return 1e2
 
 
@@ -795,6 +794,6 @@ class RB_Aniso_Optimiser(object):
             # Rotation info
             self.l.show_info('Rotation   : x : {:10.4f} | y : {:10.4f} | y : {:10.4f} |'.format(rot_sigma[0], rot_sigma[1],rot_sigma[2]))
 
-
+        print score
         # Return score
         return score
