@@ -411,6 +411,8 @@ def run(args = None,
                                              interleaved_conf=0,
                                              atom_hetatm=True)
 
+    l.show_info('Score: {}'.format(template_pdb.rb_score))
+
     #### End of Program ####
 
     return l

@@ -22,7 +22,7 @@ class RB_PDB(object):
         self.symmetry = symmetry
         self.n_model = None
         self.rb_hierarchy = None
-        self.rb_score = 1e6
+        self.rb_score = np.float64(100000000.)
 
     def _distance_between_cart_lists(self,
                                      vec1 = None,
@@ -615,7 +615,7 @@ class RB_Optimiser(object):
                                                                                         score))
 
         # if score is better save score and hierarchy
-        if self.template_pdb.rb_hierarchy == None or self.template_pdb.rb_score < score:
+        if self.template_pdb.rb_score > score:
             self.template_pdb.rb_score = score
             self.template_pdb.rb_hierarchy = self.template_pdb.rb_ens_hierarchy 
 
@@ -794,9 +794,10 @@ class RB_Aniso_Optimiser(object):
                     score))
 
         # if score is better save score and hierarchy
-        if self.template_pdb.rb_hierarchy == None or self.template_pdb.rb_score < score:
+
+        if self.template_pdb.rb_score > score :
             self.template_pdb.rb_score = score
-            self.template_pdb.rb_hierarchy = self.template_pdb.rb_ens_hierarchy 
+            self.template_pdb.rb_hierarchy = self.template_pdb.rb_ens_hierarchy
 
         # Return score
         return score
