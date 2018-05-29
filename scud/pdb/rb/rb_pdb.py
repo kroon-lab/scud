@@ -21,6 +21,8 @@ class RB_PDB(object):
         self.selection = selection
         self.symmetry = symmetry
         self.n_model = None
+        self.rb_hierarchy = None
+        self.rb_score = 1e6
 
     def _distance_between_cart_lists(self,
                                      vec1 = None,
@@ -291,25 +293,7 @@ class RB_PDB(object):
         '''
 
 
-        #### If translation_sigma is a single value do isotropic ####
-        
-        if isinstance(translation_sigma, list) == False:
-        
-            translation_sigma_x = translation_sigma
-            translation_sigma_y = translation_sigma
-            translation_sigma_z = translation_sigma
-
-            tolerance_sigma = translation_sigma
-
-        #### If translation_sigma is a list do anisotropic ####
-
-        elif isinstance(translation_sigma, list) == True:
-            
-            translation_sigma_x = translation_sigma[0]
-            translation_sigma_y = translation_sigma[1]
-            translation_sigma_z = translation_sigma[2]
-
-            tolerance_sigma = np.linalg.norm(translation_sigma)
+        tolerance_sigma = translation_sigma
 
         #### Init parameters ####
 
@@ -321,7 +305,7 @@ class RB_PDB(object):
 
         # set tolerance
         n = 2 # Should be input parameter
-        tolerance = n * tolerance_sigma
+        tolerance = n * translation_sigma 
 
         for i in range(ensemble_size):
 
@@ -343,9 +327,9 @@ class RB_PDB(object):
 
                 #### Create coordinates #####
 
-                x = (np.cos(2 * np.pi * v2) * fac) * translation_sigma_x
-                y = (np.sin(2 * np.pi * v2) * fac) * translation_sigma_y
-                z = (np.cos(2 * np.pi * v3) * fac) * translation_sigma_z
+                x = (np.cos(2 * np.pi * v2) * fac) * translation_sigma
+                y = (np.sin(2 * np.pi * v2) * fac) * translation_sigma
+                z = (np.cos(2 * np.pi * v3) * fac) * translation_sigma
 
                 #### Calculate distance ####
 
@@ -630,6 +614,11 @@ class RB_Optimiser(object):
                                                                                         rot_sigma,
                                                                                         score))
 
+        # if score is better save score and hierarchy
+        if self.template_pdb.rb_hierarchy == None or self.template_pdb.rb_score < score:
+            self.template_pdb.rb_score = score
+            self.template_pdb.rb_hierarchy = self.template_pdb.rb_ens_hierarchy 
+
         # Return score
         return score
 
@@ -638,16 +627,24 @@ class RB_Aniso_Optimiser(object):
     Simplex optimiser class.
 
     Calls scitbx simplex and optimizes target function for rotation and translation
+
+    - Aniso in rotation (3 params)
+    - optimize center of mass (3 params)
+    - isotropic translation (1 param)
+
+      7 parameters to optimize
     '''
     def __init__(self,
-                 trans_sigma_array = None,
+                 trans_sigma = None,
                  rot_sigma_array = None,
+                 center_of_mass = None,
                  template_pdb = None,
                  ens_size = None,
                  target_b = None,
                  mask = None,
                  rb_type = None,
-                 step_size = 1.1,
+                 step = None,
+                 start_step_list = None,
                  l = None):
 
         '''
@@ -674,41 +671,47 @@ class RB_Aniso_Optimiser(object):
         # Create start matrix for simplex
         start_simplex = None
         
-        # Translation setup:
-        if self.rb_type == 'trans':
-            # Number of parameters
-            self.n = 3 
-            # Start array
-            start_simplex = np.repeat([trans_sigma_array],self.n+1,axis=0)
-
         # Rotation setup
         if self.rb_type == 'rot':
             # Number of parameters 
-            self.n = 3
-            # Start array
-            start_simplex = np.repeat([rot_sigma_array] ,self.n+1,axis=0)
-        
-        # Mix setup
-        if self.rb_type == 'mix':
-            # Number of parameters 
             self.n = 6
-            # Combine rot and trans start sigma (Simplex accepts single list of params)
-            appended_sigma = np.append(trans_sigma_array,rot_sigma_array)
+            # Combine parameters
+            appended_sigma = np.append(rot_sigma_array,center_of_mass,axis=0)
             # Start array
             start_simplex = np.repeat([appended_sigma] ,self.n+1,axis=0)
 
-        # Start array with step sizes
+            #### Determin order of magnitude of step sizes ####
+            
+            start_step_list = start_step_list[1:]
+
+            # Max step size (first cycle only)
+            l.show_info('Step list: {}'.format([i*step for i in start_step_list]))
+
+        # Mix setup
+        elif self.rb_type == 'mix':
+            # Number of parameters 
+            self.n = 7
+            # Combine rot and trans start sigma (Simplex accepts single list of params)
+            appended_sigma = np.append(np.array([trans_sigma]),rot_sigma_array,axis=0)
+            appended_sigma = np.append(appended_sigma,center_of_mass,axis=0)
+            # Start array
+            start_simplex = np.repeat([appended_sigma] ,self.n+1,axis=0)
+
+            ####  Determine order of magnitude of step sizes ###
+
+            # Max step size (first cycle only)
+            l.show_info('Step list: {}'.format([i*step for i in start_step_list]))
+
+        else:
+            raise Exception('Error in aniso_rb_opt with rb_type')
+
+        #### Start array with step sizes applied to start values ####
         for ii in range(self.n):
-            start_simplex[ii+1, ii] = step_size*start_simplex[ii+1, ii]
+            start_simplex[ii+1, ii] = start_step_list[ii]*step + start_simplex[ii+1, ii]
 
-        # Print some info
+        # Print info
         l.process_message('Minimizing {} parameters'.format(self.n))
-        l.show_info('Starting Simplex Matrix: \n')
-
-        # Print start simplex
-        for i in start_simplex:
-            l.show_info('{}'.format(i))
-        l.show_info('\n')
+        l.process_message('Scaling step size with {}'.format(step))
 
         #### Perform Simplex minimization ####
 
@@ -717,7 +720,7 @@ class RB_Aniso_Optimiser(object):
         simplex = simplex_opt(dimension = self.n,
                               matrix = start_simplex,
                               evaluator = self,
-                              tolerance = 10)
+                              tolerance = 1e-2)
 
         # Extract result
         self.result = simplex.get_solution()
@@ -731,21 +734,11 @@ class RB_Aniso_Optimiser(object):
         #### Parameters to optimize ####
         
         # depending on rb_type        
-        if self.rb_type == 'trans':
-
-            # split parameters into 3 translation sigma's
-            trans_sigma = list(parameters)
-            rot_sigma = 0.0
-
-            # Penalty for negative values
-            if trans_sigma[0] < 0 or trans_sigma[1] < 0 or trans_sigma[2] < 0:
-                l.warning('negative translation sigma')
-                return 1e2
-
-        elif self.rb_type == 'rot':
+        if self.rb_type == 'rot':
 
             # Obtain rotation parameters
-            rot_sigma = list(parameters)
+            rot_sigma = list(parameters)[0:3]
+            center_of_mass = list(parameters)[3:6]
             trans_sigma = 0.0
 
             # pentalty for negative values
@@ -756,12 +749,12 @@ class RB_Aniso_Optimiser(object):
         elif self.rb_type == 'mix':
 
             # split parameters into 3 translation sigma's and 3 rot sigma's
-            trans_sigma = list(parameters[0:3])
-            rot_sigma = list(parameters[3:6])
+            trans_sigma = parameters[0]
+            rot_sigma = list(parameters[1:4])
+            center_of_mass = list(parameters[4:7])
 
             # Penalty for negative values
-            if trans_sigma[0] < 0 or trans_sigma[1] < 0 or trans_sigma[2] < 0 or rot_sigma[0] < 0 or rot_sigma[1] < 0 or rot_sigma[2] < 0:
-                #l.warning('negative translation sigma')
+            if trans_sigma < 0 or rot_sigma[0] < 0 or rot_sigma[1] < 0 or rot_sigma[2] < 0:
                 return 1e2
 
 
@@ -773,7 +766,7 @@ class RB_Aniso_Optimiser(object):
         # Target function placed in RB_PDB class
         score = self.template_pdb.simplex_target_func_ca(trans_sigma = trans_sigma,
                                                          rot_sigma = rot_sigma,
-                                                         center_of_mass = self.center_of_mass,
+                                                         center_of_mass = center_of_mass,
                                                          ens_size = self.ens_size,
                                                          target_b = self.target_b,
                                                          mask = self.mask,
@@ -781,19 +774,29 @@ class RB_Aniso_Optimiser(object):
                                                          l = self.l)
         #### Print info per cycle ####
 
-        if self.rb_type == 'trans':
-            self.l.show_info('Translation: x : {:10.4f} | y : {:10.4f} | y : {:10.4f} |'.format(trans_sigma[0], trans_sigma[1],trans_sigma[2]))
-
         if self.rb_type == 'rot':
-            self.l.show_info('Rotation   : x : {:10.4f} | y : {:10.4f} | y : {:10.4f} |'.format(rot_sigma[0], rot_sigma[1],rot_sigma[2]))
+            self.l.show_info('| Rotation: {:6.2f},{:6.2f},{:6.2f}  |  COM: {:6.2f},{:6.2f},{:6.2f}  |  score: {:6.2f} |'.format(rot_sigma[0], 
+                     rot_sigma[1],
+                     rot_sigma[2],
+                     center_of_mass[0], 
+                     center_of_mass[1], 
+                     center_of_mass[2], 
+                     score))
 
         if self.rb_type == 'mix':
-            # Translation info
-            self.l.show_info('Translation: x : {:10.4f} | y : {:10.4f} | y : {:10.4f} |'.format(trans_sigma[0], trans_sigma[1],trans_sigma[2]))
+            self.l.show_info('| Translation: {:6.2f}  |  Rotation: {:6.2f},{:6.2f},{:6.2f}  |  COM: {:6.2f},{:6.2f},{:6.2f}  |  score: {:6.2f} |'.format(trans_sigma, 
+                    rot_sigma[0], 
+                    rot_sigma[1],
+                    rot_sigma[2],
+                    center_of_mass[0], 
+                    center_of_mass[1], 
+                    center_of_mass[2], 
+                    score))
 
-            # Rotation info
-            self.l.show_info('Rotation   : x : {:10.4f} | y : {:10.4f} | y : {:10.4f} |'.format(rot_sigma[0], rot_sigma[1],rot_sigma[2]))
+        # if score is better save score and hierarchy
+        if self.template_pdb.rb_hierarchy == None or self.template_pdb.rb_score < score:
+            self.template_pdb.rb_score = score
+            self.template_pdb.rb_hierarchy = self.template_pdb.rb_ens_hierarchy 
 
-        print score
         # Return score
         return score

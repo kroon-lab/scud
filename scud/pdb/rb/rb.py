@@ -259,78 +259,92 @@ def run(args = None,
 
     elif p.params.aniso == True:
 
+        #### Rational starting values of simplex ####
+
         # Translation start
-        start_trans = b_to_rmsf(np.mean(filter_b))/ 3.
-        trans_sigma_array = np.array([start_trans]*3)
-
+        start_trans = b_to_rmsf(np.min(filter_b))
         # rotation start
-        rot_sigma_array = np.array([4., 1.5, 4.])
+        rot_sigma_array = np.array([2.,2.,2.])
+        # center of mass start
+        com = template_pdb.com
 
+        #### Simplex Control ####
 
-        # For aniso rotation or translation 
-        if p.input.rb_type == 'trans' or p.input.rb_type == 'rot':
+        # Step size change within simplex method
+        step_change_list = [1., .75, 0.5, 0.1]
 
-            # Start simplex
-            rb_optimizer = RB_Aniso_Optimiser(trans_sigma_array = trans_sigma_array,
-                                              rot_sigma_array = rot_sigma_array,
-                                              template_pdb = template_pdb,
-                                              ens_size = ens_size,
-                                              target_b = target_pdb.target_b[target_pdb.mask],
-                                              mask = target_pdb.mask,
-                                              rb_type = p.input.rb_type,
-                                              step_size = 5.,
-                                              l = l)
+        # Start values of simple (user input)
+        start_step_list = [p.params.trans_step,
+                           p.params.rot_x_step,
+                           p.params.rot_y_step,
+                           p.params.rot_z_step,
+                           p.params.com_x_step,
+                           p.params.com_y_step,
+                           p.params.com_z_step]
+        # Translation can not be fitted anisotropically
+        if p.input.rb_type == 'trans':
+            l.process_message('Translation cannot be fitted anisotropically...\n quiting.')
+            quit()
+        
+        #### Simplex rot ####
 
+        elif p.input.rb_type == 'rot':
 
-        #### Single simplex for rot and trans, find starting vals for mix: ####
+            #### Collect start values ####
+
+            rot = rot_sigma_array
+            com = template_pdb.com
+
+            #### Loop over step size list, update start values ####
+
+            for step in step_change_list:
+
+                # Start simplex
+                rb_optimizer = RB_Aniso_Optimiser(trans_sigma = 0.0,
+                                                  rot_sigma_array = rot,
+                                                  center_of_mass = com,
+                                                  template_pdb = template_pdb,
+                                                  ens_size = ens_size,
+                                                  target_b = target_pdb.target_b[target_pdb.mask],
+                                                  mask = target_pdb.mask,
+                                                  rb_type = 'rot',
+                                                  step = step,
+                                                  start_step_list = start_step_list,
+                                                  l = l)
+                r = list(rb_optimizer.result)
+                rot = r[0:3]
+                com = r[3:6]
+
+        #### Simplex mix ####
 
         elif p.input.rb_type == 'mix':
-
-            #### First find translation start values ####
-
-            #rb_optimizer = RB_Aniso_Optimiser(trans_sigma_array = trans_sigma_array,
-            #                                  rot_sigma_array = rot_sigma_array,
-            #                                  template_pdb = template_pdb,
-            #                                  ens_size = ens_size,
-            #                                  target_b = target_pdb.target_b[target_pdb.mask],
-            #                                  mask = target_pdb.mask,
-            #                                  rb_type = 'rot',
-            #                                  step_size = 5,
-            #                                  l = l)
-
-            # Save for later 
-            #trans_1 = np.array(list(rb_optimizer.result))#*0.75
-#            rot = np.array(list(rb_optimizer.result))#*0.75
             
+            #### Collect start values ####
 
-            #### Find start values for rotation ####
+            trans = start_trans
+            rot = rot_sigma_array
+            com = template_pdb.com
 
-            rb_optimizer = RB_Aniso_Optimiser(trans_sigma_array = trans_sigma_array,
-                                              rot_sigma_array = rot_sigma_array,
-                                              template_pdb = template_pdb,
-                                              ens_size = ens_size,
-                                              target_b = target_pdb.target_b[target_pdb.mask],
-                                              mask = target_pdb.mask,
-                                              rb_type = 'mix',
-                                              step_size = 5,
-                                              l = l)
+            #### Loop over step size list, update start values ####
 
-            # Save for later 
-            trans_2 = list(rb_optimizer.result)[0:3]
-            rot_1 = list(rb_optimizer.result)[3:6]
+            for step in step_change_list:
 
-            #### Find start values for rotation ####
-
-            rb_optimizer = RB_Aniso_Optimiser(trans_sigma_array = trans_2,
-                                              rot_sigma_array = rot_1,
-                                              template_pdb = template_pdb,
-                                              ens_size = ens_size,
-                                              target_b = target_pdb.target_b[target_pdb.mask],
-                                              mask = target_pdb.mask,
-                                              rb_type = 'mix',
-                                              l = l)
-
-
+                rb_optimizer = RB_Aniso_Optimiser(trans_sigma = trans,
+                                                  rot_sigma_array = rot,
+                                                  center_of_mass = com,
+                                                  template_pdb = template_pdb,
+                                                  ens_size = ens_size,
+                                                  target_b = target_pdb.target_b[target_pdb.mask],
+                                                  mask = target_pdb.mask,
+                                                  rb_type = 'mix',
+                                                  step = step,
+                                                  start_step_list = start_step_list,
+                                                  l = l)
+                r = list(rb_optimizer.result)
+                trans = r[0]
+                rot = r[1:4]
+                com = r[4:7]
+            
     # check for errors
     else:
         raise Exception('No or wrong aniso input')
@@ -389,13 +403,13 @@ def run(args = None,
 
     #### Writing RB ensemble to file
 
-    template_pdb.rb_ens_hierarchy.write_pdb_file(file_name=p.output.pdb_out,
-                                                 open_append=False,
-                                                 crystal_symmetry=target_pdb.symmetry,
-                                                 write_scale_records=True,
-                                                 append_end=False,
-                                                 interleaved_conf=0,
-                                                 atom_hetatm=True)
+    template_pdb.rb_hierarchy.write_pdb_file(file_name=p.output.pdb_out,
+                                             open_append=False,
+                                             crystal_symmetry=target_pdb.symmetry,
+                                             write_scale_records=True,
+                                             append_end=False,
+                                             interleaved_conf=0,
+                                             atom_hetatm=True)
 
     #### End of Program ####
 
