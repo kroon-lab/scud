@@ -8,14 +8,14 @@ def phil_parse(args=None,log=None):
     '''
     # Default parameters
     master_phil = libtbx.phil.parse("""
-    mtz2map
+    ewald
       {
         input
           .help = "Input files"
         {
           mtz_in = None
             .type = path
-            .help = 'MTZ file, to be converted to map'
+            .help = 'MTZ file, to be converted to map on Ewald sphere'
         }
         params
           .help = "Control running"
@@ -23,15 +23,9 @@ def phil_parse(args=None,log=None):
           array = None
             .type = str
             .help = 'Array column name'
-          array2= None
-             .type = str
-             .help = 'Array column name for second column'
-          supercell_size_1 = 1
-            .type = int
-            .help = 'Size of supercell used to generate map, determines sampling of map'
-          centro = True
-            .type = bool
-            .help = 'Apply centrosymmetry to the map'
+          center = None
+            .type = str
+            .help = 'Define center of Ewald sphere with respect to unit cell'
         }
         output
           .help = "output files"

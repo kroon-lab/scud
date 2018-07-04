@@ -40,7 +40,12 @@ def run(args=None, l=None):
 
     mtz = MTZClass(p.input.mtz_in,p.params.array)
     l.process_message('Input MTZ file read and column extracted...')
-
+    if p.params.centro == False:
+        if p.params.array2 != None:
+            mtz2 = MTZClass(p.input.mtz_in,p.params.array2)
+        else:
+            print 'Give name of second array'
+            quit()
 ###########################################################################
 #                    Initializing final map                               #
 ###########################################################################
@@ -69,13 +74,23 @@ def run(args=None, l=None):
     ma = mtz.miller_array
     idxs = np.array(ma.set().indices())
     vals = np.array(ma.data())
+    if p.params.centro == False:
+        ma2 = mtz2.miller_array
+        vals2 = np.array(ma2.data())
+    print p.params.array
+    if p.params.array2 != None:
+        print p.params.array2
     g = flex.grid(final_shape)
     # Mapping 3D miller indices to 1D array indices (slow)
     pos_idx = map(g, idxs + origin)
     neg_idx = map(g, (idxs*-1) + origin)
     # Fill the array (as 1D)
-    zero_array.put(pos_idx, vals)
-    zero_array.put(neg_idx, vals)
+    if p.params.centro == True:
+       zero_array.put(pos_idx, vals)
+       zero_array.put(neg_idx, vals)
+    else:
+        zero_array.put(pos_idx,vals)
+        zero_array.put(neg_idx,vals2)
     l.process_message('Filled array...')
 
 ###########################################################################

@@ -8,6 +8,7 @@ from cctbx.array_family import flex
 import numpy as np
 
 class MTZClass(object):
+#class MTZClass:
 
     def __init__(self,fname, array_name=None):
         self.name = fname
