@@ -317,20 +317,39 @@ class RB_PDB(object):
 
                 #### Generate uniform random distributions ####
 
-                v1 = np.random.random()
-                v2 = 2 * np.random.random()-1
-                v3 = 2 * np.random.normal()-1
+#                v1 = np.random.random()
+#                v2 = 2 * np.random.random()-1
+#                v3 = 2 * np.random.normal()-1
+                x = np.random.normal(0.0,translation_sigma)
+                y = np.random.normal(0.0,translation_sigma)
+                z = np.random.normal(0.0,translation_sigma)
+#LKB                v1 = 2 * np.random.normal()-1
+#LKB                v2 = 2 * np.random.normal()-1
+#LKB                v3 = 2 * np.random.normal()-1
+#LKB                v1 = np.random.random()
+#LKB                v2 = np.random.random()
+#LKB                v3 = np.random.random()
+#LKB                v4 = np.random.random()
 
                 #### Factor to convert to normal distribution ####
 
-                fac = np.sqrt(-2 * np.log(v1))
+#                print 'v1v2v3',v1,v2,v3
+#                fac = np.sqrt(-2 * np.log(v1))
+#LKB                fac2 = np.sqrt(-2 * np.log(v4))
+#LKB                fac = 1 
 
                 #### Create coordinates #####
 
-                x = (np.cos(2 * np.pi * v2) * fac) * translation_sigma
-                y = (np.sin(2 * np.pi * v2) * fac) * translation_sigma
-                z = (np.cos(2 * np.pi * v3) * fac) * translation_sigma
+#                x = (np.cos(2 * np.pi * v2) * fac) * translation_sigma
+#                y = (np.sin(2 * np.pi * v2) * fac) * translation_sigma
+#                z = (np.cos(2 * np.pi * v3) * fac) * translation_sigma
 
+#LKB                x = v1 * translation_sigma
+#LKB                y = v2 * translation_sigma
+#LKB                z = v3 * translation_sigma
+
+#                print 'xyz',x,y,z
+                
                 #### Calculate distance ####
 
                 vector_length = np.linalg.norm(np.array([x,y,z]))
@@ -342,6 +361,7 @@ class RB_PDB(object):
                     # Escape while statement
                     sigma_check = True
 
+#            print 'vector',vector_length
             # Save vector and vector length to lists
             self.v_list.append(np.array([x,y,z]))
             self.v_dist_list.append(vector_length)
@@ -560,6 +580,7 @@ class RB_Optimiser(object):
             raise Exception('Invalid value')
 
         for ii in range(self.n):
+            print 'ii',ii,' self.n',self.n
             start_simplex[ii+1, ii] = 1.1*start_simplex[ii+1, ii]
 
         #### Perform Simplex minimization ####
@@ -595,6 +616,8 @@ class RB_Optimiser(object):
         #### Target function ####
 
         #### Penalize negative value for sigma's ####
+#        print self.template_pdb.simplex_target_func_ca,'ca'
+
         if trans_sigma < 0 or rot_sigma < 0:
             score = 1e2
 
@@ -608,7 +631,6 @@ class RB_Optimiser(object):
                                                              mask = self.mask,
                                                              rb_type = self.rb_type,
                                                              l = self.l)
-
 
         self.l.show_info('| trans: {:10.4f} | rot: {:10.4f} | score: {:10.4f} |'.format(trans_sigma,
                                                                                         rot_sigma,

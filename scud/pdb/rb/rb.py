@@ -65,13 +65,14 @@ def run(args = None,
     # Read input parameters
     working_params = rb_phil.phil_parse(args=args,log=l)  # use phil to process input
     p = working_params.rb
-
+    
 ###########################################################################
 #                             Set Seed                                    #
 ###########################################################################
 
     # Set seed for random number generators used for translation and rotation
     np.random.seed(p.params.seed)
+
 
 ###########################################################################
 #                          Read PDB file                                  #
@@ -82,7 +83,7 @@ def run(args = None,
     # Check if a different target pdb is supplies
     if p.input.target_pdb == None:
         target_pdb_fname = p.input.template_pdb
-
+        
     else:
         target_pdb_fname = p.input.target_pdb
 
@@ -103,6 +104,8 @@ def run(args = None,
 
     # For plotting later on:
     residue_numbers = [int(resid.resseq) for resid in target_pdb.hierarchy.models()[0].chains()[0].residues()]
+    
+    
 
 ###########################################################################
 #                          Prep B-factors                                 #
@@ -125,6 +128,8 @@ def run(args = None,
         # Create B-factor mask
         target_pdb.create_b_factor_mask(n_sigma=n_sigma)
         filter_b = target_pdb.target_b[target_pdb.mask]
+#        print 'mask',target_pdb.mask
+        print 'filter_b', filter_b
 
         # Print info
         l.show_info('Average CA B-factor after masking: {}'
@@ -194,6 +199,8 @@ def run(args = None,
 
             #### Initialize start values for rb_type trans ####
 
+            #### rmsf^2 = 2*sigma^2  in normal distribution ####
+            
             start_trans_sigma = b_to_rmsf(np.mean(filter_b))*1.4
             l.show_info('Start trans_sigma = {}'.format(start_trans_sigma))
             start_rot_sigma = 3.
